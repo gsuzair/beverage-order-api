@@ -19,8 +19,7 @@ public class Beverage {
         this.price = price;
         this.quantity = quantity;
     }
-
-    // 🧠 Here's what you need:
+    
     public Integer getId() {
         return id;
     }

@@ -6,7 +6,7 @@ import jakarta.xml.bind.annotation.XmlRootElement;
 @XmlRootElement
 public class OrderItemDTO {
     private Integer beverageId;
-    private int quantity;
+    private Integer quantity;
 
     public OrderItemDTO() {
     }
@@ -24,11 +24,11 @@ public class OrderItemDTO {
         this.beverageId = beverageId;
     }
 
-    public int getQuantity() {
+    public Integer getQuantity() {
         return quantity;
     }
 
-    public void setQuantity(int quantity) {
+    public void setQuantity(Integer quantity) {
         this.quantity = quantity;
     }
 

@@ -6,9 +6,13 @@ import de.uniba.soa.model.Order;
 import de.uniba.soa.model.OrderItem;
 import de.uniba.soa.model.dto.rest.OrderDTO;
 import de.uniba.soa.model.dto.rest.OrderItemDTO;
+import de.uniba.soa.model.dto.rest.OrderListResponse;
+import de.uniba.soa.model.dto.rest.Pagination;
 import jakarta.ws.rs.*;
+import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+import jakarta.ws.rs.core.UriInfo;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -22,14 +26,29 @@ public class OrderResource {
     private final DataStore dataStore = DataStore.getInstance();
 
     @GET
-    public Response getOrders() {
-        List<Order> orders = DataStore.getInstance().getOrders();
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response getOrders(@Context UriInfo uriInfo,
+                              @QueryParam("page") @DefaultValue("1") int page,
+                              @QueryParam("size") @DefaultValue("10") int size) {
 
-        List<OrderDTO> orderDTOs = orders.stream()
+        List<Order> allOrders = DataStore.getInstance().getOrders();
+
+        int totalItems = allOrders.size();
+        int fromIndex = Math.min((page - 1) * size, totalItems);
+        int toIndex = Math.min(fromIndex + size, totalItems);
+        List<Order> pagedOrders = allOrders.subList(fromIndex, toIndex);
+
+        List<OrderDTO> dtos = pagedOrders.stream()
                 .map(OrderDTO::fromOrder)
                 .toList();
 
-        return Response.ok(orderDTOs).build();
+        OrderListResponse response = new OrderListResponse();
+        response.setOrders(dtos);
+        int totalPages = (int) Math.ceil((double) totalItems / size);
+        response.setPagination(new Pagination(page, size, totalItems, totalPages));
+        response.setHref(uriInfo.getRequestUri().toString());
+
+        return Response.ok(response).build();
     }
 
     @GET
@@ -49,33 +68,51 @@ public class OrderResource {
 
     @POST
     public Response createOrder(OrderDTO orderDTO) {
+        if (orderDTO == null || orderDTO.getItems() == null || orderDTO.getItems().isEmpty()) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity("Order must contain at least one item.").build();
+        }
+
         List<OrderItem> orderItems = new ArrayList<>();
 
-        // Validate and process each item
         for (OrderItemDTO itemDTO : orderDTO.getItems()) {
-            Beverage beverage = DataStore.getInstance().getBeverageById(itemDTO.getBeverageId());
-
-            if (beverage == null) {
+            if (itemDTO.getBeverageId() == null || itemDTO.getBeverageId() < 0) {
                 return Response.status(Response.Status.BAD_REQUEST)
                         .entity("Invalid beverage ID: " + itemDTO.getBeverageId()).build();
+            }
+
+            // Validate quantity
+            if (itemDTO.getQuantity() == null || itemDTO.getQuantity() <= 0) {
+                return Response.status(Response.Status.BAD_REQUEST)
+                        .entity("Quantity must be a positive number for beverage ID: " + itemDTO.getBeverageId()).build();
+            }
+
+            // Check if beverage exists
+            Beverage beverage = DataStore.getInstance().getBeverageById(itemDTO.getBeverageId());
+            if (beverage == null) {
+                return Response.status(Response.Status.BAD_REQUEST)
+                        .entity("Beverage not found: " + itemDTO.getBeverageId()).build();
             }
 
             if (beverage.getQuantity() < itemDTO.getQuantity()) {
                 return Response.status(Response.Status.BAD_REQUEST)
                         .entity("Not enough stock for beverage: " + beverage.getName()).build();
             }
+
             beverage.setQuantity(beverage.getQuantity() - itemDTO.getQuantity());
+
             orderItems.add(new OrderItem(itemDTO.getBeverageId(), itemDTO.getQuantity()));
         }
 
         String orderId = UUID.randomUUID().toString();
         Order order = new Order(orderId, orderItems, "SUBMITTED");
-
         DataStore.getInstance().addOrder(order);
 
         return Response.status(Response.Status.CREATED)
-                .entity(OrderDTO.fromOrder(order)).build();
+                .entity(OrderDTO.fromOrder(order))
+                .build();
     }
+
 
 
     @PUT

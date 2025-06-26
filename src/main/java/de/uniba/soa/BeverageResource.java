@@ -4,46 +4,59 @@ import de.uniba.soa.data.DataStore;
 import de.uniba.soa.model.Beverage;
 
 import de.uniba.soa.model.dto.rest.BeverageDTO;
+import de.uniba.soa.model.dto.rest.BeverageListResponse;
+import de.uniba.soa.model.dto.rest.Pagination;
 import jakarta.ws.rs.*;
+import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+import jakarta.ws.rs.core.UriInfo;
+
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Path("/beverages")
 @Produces(MediaType.APPLICATION_JSON)
 public class BeverageResource {
 
     @GET
-    public Response getBeverages(
-            @QueryParam("minPrice") Double minPrice,
-            @QueryParam("maxPrice") Double maxPrice,
-            @QueryParam("page") @DefaultValue("1") int page,
-            @QueryParam("size") @DefaultValue("10") int size
-    ) {
-        List<Beverage> allBeverages = DataStore.getInstance().getBeverages();
-        if (minPrice != null) {
-            allBeverages = allBeverages.stream()
-                    .filter(b -> b.getPrice() >= minPrice)
-                    .toList();
-        }
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response getBeverages(@Context UriInfo uriInfo,
+                                 @QueryParam("minPrice") Double minPrice,
+                                 @QueryParam("maxPrice") Double maxPrice,
+                                 @QueryParam("page") @DefaultValue("1") int page,
+                                 @QueryParam("size") @DefaultValue("10") int size) {
 
-        if (maxPrice != null) {
-            allBeverages = allBeverages.stream()
-                    .filter(b -> b.getPrice() <= maxPrice)
-                    .toList();
-        }
+        List<Beverage> all = DataStore.getInstance().getBeverages();
+        List<Beverage> filtered = all.stream()
+                .filter(b -> (minPrice == null || b.getPrice() >= minPrice) &&
+                        (maxPrice == null || b.getPrice() <= maxPrice))
+                .collect(Collectors.toList());
 
-        int fromIndex = (page - 1) * size;
-        int toIndex = Math.min(fromIndex + size, allBeverages.size());
-        if (fromIndex >= allBeverages.size()) {
-            return Response.status(Response.Status.BAD_REQUEST)
-                    .entity("Page number out of range").build();
-        }
+        int totalItems = filtered.size();
+        int fromIndex = Math.min((page - 1) * size, totalItems);
+        int toIndex = Math.min(fromIndex + size, totalItems);
+        List<Beverage> paged = filtered.subList(fromIndex, toIndex);
 
-        List<Beverage> paginated = allBeverages.subList(fromIndex, toIndex);
-        return Response.ok(paginated).build();
+        List<BeverageDTO> dtos = paged.stream().map(b -> {
+            BeverageDTO dto = BeverageDTO.from(b);
+            String beverageHref = uriInfo.getBaseUriBuilder()
+                    .path("beverages")
+                    .path(String.valueOf(dto.getId()))
+                    .build()
+                    .toString();
+            dto.setHref(beverageHref);
+            return dto;
+        }).collect(Collectors.toList());
+
+        BeverageListResponse response = new BeverageListResponse();
+        response.setBeverages(dtos);
+        int totalPages = (int) Math.ceil((double) totalItems / size);
+        response.setPagination(new Pagination(page, size, totalItems, totalPages));
+        response.setHref(uriInfo.getRequestUri().toString());
+
+        return Response.ok(response).build();
     }
-
 
     @POST
     @Consumes(MediaType.APPLICATION_JSON)
@@ -58,6 +71,7 @@ public class BeverageResource {
 
         return Response.status(Response.Status.CREATED).entity(beverage).build();
     }
+
 
     @PUT
     @Path("/{id}")

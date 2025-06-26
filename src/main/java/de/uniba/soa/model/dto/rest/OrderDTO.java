@@ -45,7 +45,6 @@ public class OrderDTO {
         this.status = status;
     }
 
-    // Convert from logic model to DTO
     public static OrderDTO fromOrder(Order order) {
         List<OrderItemDTO> dtoItems = order.getItems().stream()
                 .map(OrderItemDTO::fromOrderItem)

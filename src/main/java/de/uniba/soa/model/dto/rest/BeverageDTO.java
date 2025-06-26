@@ -10,6 +10,7 @@ public class BeverageDTO {
     private double price;
     private int quantity;
     private String type;
+    private String href;
 
     public BeverageDTO() {
     }
@@ -21,8 +22,6 @@ public class BeverageDTO {
         this.quantity = quantity;
         this.type = type;
     }
-
-    // Getters & Setters
 
     public Integer getId() {
         return id;
@@ -63,13 +62,21 @@ public class BeverageDTO {
         this.type = type;
     }
 
-    public static BeverageDTO fromBeverage(Beverage beverage) {
-        return new BeverageDTO(
-                beverage.getId(),
-                beverage.getName(),
-                beverage.getPrice(),
-                beverage.getQuantity(),
-                beverage.getType()
-        );
+    public String getHref() {
+        return href;
+    }
+
+    public void setHref(String href) {
+        this.href = href;
+    }
+
+    public static BeverageDTO from(Beverage beverage) {
+        BeverageDTO dto = new BeverageDTO();
+        dto.setId(beverage.getId());
+        dto.setName(beverage.getName());
+        dto.setType(beverage.getType());
+        dto.setPrice(beverage.getPrice());
+        dto.setQuantity(beverage.getQuantity());
+        return dto;
     }
 }

@@ -11,7 +11,6 @@ import java.util.Set;
 public class ApplicationConfig extends ResourceConfig  {
 
     public ApplicationConfig() {
-        // Automatically scan this package for @Path-annotated classes
         packages("de.uniba.soa");
     }
 }
